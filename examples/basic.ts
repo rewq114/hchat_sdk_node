@@ -58,9 +58,11 @@ async function thinkingExample(model: string = "gpt-4.1") {
 }
 
 // Run
-// const model =  "gpt-4.1";
-const model = "gemini-2.5-flash";
-// const model = "gemini-2.5-pro";
+// const model = "gpt-4o";
+// const model = "gpt-4.1";
+// const model = "gemini-2.5-flash";
+const model = "gemini-2.5-pro";
 // const model = "claude-sonnet-4";
+// const model = "claude-opus-4";
 // basicExample(model).catch(console.error);
 thinkingExample(model).catch(console.error);

@@ -53,7 +53,7 @@ export class GeminiProvider extends BaseProvider {
 
       // SSE 스트림을 파싱하고 각 데이터 청크를 변환하여 반환
       for await (const data of parseSSEStream(response)) {
-        this.log("", data.candidates[0].content.parts);
+        // this.log("", data.candidates[0].content.parts);
         const chunk = this.convertGeminiChunk(data, request.model);
         if (chunk) {
           yield chunk;
@@ -160,13 +160,21 @@ export class GeminiProvider extends BaseProvider {
 
   private convertGeminiChunk(data: any, model: string): StreamChunk | null {
     const candidate = data.candidates?.[0];
-    const content = candidate?.content?.parts?.[0]?.text;
+    let content: string;
 
-    if (!content) return null;
+    if (data.thinking && data.thinking.length > 0) {
+      const thought = data.thinking[0];
+      const thinkingContent =
+        thought.thought || thought.contest || JSON.stringify(thought);
+      content = `\n[thinking]\n${thinkingContent}\n</thinking>\n`;
+    } else {
+      content = candidate?.content?.parts?.[0]?.text;
 
-    return {
+      if (!content) return null;
+    }
+    const chunk: StreamChunk = {
       id: crypto.randomUUID(),
-      object: "chat.completion.chunk",
+      object: "chat.completion.chunk" as const,
       created: Date.now(),
       model: data.modelVersion || model,
       choices: [
@@ -177,6 +185,8 @@ export class GeminiProvider extends BaseProvider {
         },
       ],
     };
+
+    return chunk;
   }
 
   private handleError(error: any): Error {
