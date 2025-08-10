@@ -160,7 +160,7 @@ export class ClaudeProvider extends BaseProvider {
         this.isInThinkingBlock = false;
         this.thinkingStarted = false;
         // thinking 블록 종료 마커
-        delta.content = "[/THINKING]\n";
+        delta.content = "</thinking>\n";
       } else {
         return null;
       }
@@ -170,7 +170,7 @@ export class ClaudeProvider extends BaseProvider {
       if (event.delta?.type === "thinking_delta" && event.delta?.thinking) {
         if (!this.thinkingStarted) {
           // 첫 번째 thinking 델타 - 시작 마커 추가
-          delta.content = "[THINKING]" + event.delta.thinking;
+          delta.content = "<thinking>" + event.delta.thinking;
           this.thinkingStarted = true;
         } else {
           delta.content = event.delta.thinking;

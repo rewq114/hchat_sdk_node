@@ -53,7 +53,7 @@ export class GeminiProvider extends BaseProvider {
 
       // SSE 스트림을 파싱하고 각 데이터 청크를 변환하여 반환
       for await (const data of parseSSEStream(response)) {
-        // this.log("", data.candidates[0].content.parts);
+        // this.log("", JSON.stringify(data, null, 2));
         const chunk = this.convertGeminiChunk(data, request.model);
         if (chunk) {
           yield chunk;
@@ -84,8 +84,7 @@ export class GeminiProvider extends BaseProvider {
     if (request.thinking) {
       // generationConfig.responseModalities = ["TEXT"];
       generationConfig.thinkingConfig = {
-        thinkingBudget:
-          (request.max_tokens || 32768) > 24576 ? 24576 : request.max_tokens,
+        thinkingBudget: -1,
         includeThoughts: true,
       };
       generationConfig.temperature = 1;
@@ -160,18 +159,16 @@ export class GeminiProvider extends BaseProvider {
 
   private convertGeminiChunk(data: any, model: string): StreamChunk | null {
     const candidate = data.candidates?.[0];
-    let content: string;
+    const parts = candidate?.content?.parts?.[0];
+    let content = parts.text;
 
-    if (data.thinking && data.thinking.length > 0) {
-      const thought = data.thinking[0];
-      const thinkingContent =
-        thought.thought || thought.contest || JSON.stringify(thought);
-      content = `\n[thinking]\n${thinkingContent}\n</thinking>\n`;
-    } else {
-      content = candidate?.content?.parts?.[0]?.text;
+    if (!content) return null;
 
-      if (!content) return null;
+    // 그러나 현재 LLM에서 thought 값을 주지 않으므로 이 코드가 동작하지 않음.
+    if (parts && parts.thought === true) {
+      content = `\n<thinking>\n${content}\n</thinking>\n`;
     }
+
     const chunk: StreamChunk = {
       id: crypto.randomUUID(),
       object: "chat.completion.chunk" as const,
