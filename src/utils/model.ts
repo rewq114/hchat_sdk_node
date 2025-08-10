@@ -1,66 +1,35 @@
-import { ModelProvider } from '../types';
+export type ModelProvider = "openai" | "claude" | "gemini";
 
 export function getModelProvider(model: string): ModelProvider {
   const lowerModel = model.toLowerCase();
-  
-  if (lowerModel.startsWith('gpt-')) {
-    return 'openai';
-  } else if (lowerModel.startsWith('claude-')) {
-    return 'claude';
-  } else if (lowerModel.startsWith('gemini-')) {
-    return 'gemini';
+
+  if (lowerModel.startsWith("gpt-")) {
+    return "openai";
+  } else if (lowerModel.startsWith("claude-")) {
+    return "claude";
+    // return "openai";
+  } else if (lowerModel.startsWith("gemini-")) {
+    return "gemini";
   }
-  
+
   throw new Error(`Unknown model provider for: ${model}`);
 }
 
-export const MODEL_INFO = {
-  // OpenAI
-  'gpt-4.1': {
-    provider: 'openai',
-    context_window: 128000,
-    max_output_tokens: 4096,
-    supports_vision: true,
-    supports_tools: true,
-    supports_streaming: true,
-    supports_json_mode: true
-  },
-  'gpt-4.1-mini': {
-    provider: 'openai',
-    context_window: 128000,
-    max_output_tokens: 4096,
-    supports_vision: true,
-    supports_tools: true,
-    supports_streaming: true,
-    supports_json_mode: true
-  },
-  // Claude
-  'claude-opus-4': {
-    provider: 'claude',
-    context_window: 200000,
-    max_output_tokens: 4096,
-    supports_vision: true,
-    supports_tools: true,
-    supports_streaming: true,
-    supports_json_mode: false
-  },
-  'claude-3-5-sonnet-v2': {
-    provider: 'claude',
-    context_window: 200000,
-    max_output_tokens: 8192,
-    supports_vision: true,
-    supports_tools: true,
-    supports_streaming: true,
-    supports_json_mode: false
-  },
-  // Gemini
-  'gemini-2.0-flash': {
-    provider: 'gemini',
-    context_window: 1000000,
-    max_output_tokens: 8192,
-    supports_vision: true,
-    supports_tools: true,
-    supports_streaming: true,
-    supports_json_mode: true
-  }
-};
+// export const MODEL_INFO = {
+//   // OpenAI
+//   "gpt-4.1": { provider: "openai", maxTokens: 4096 },
+//   "gpt-4.1-mini": { provider: "openai", maxTokens: 4096 },
+//   "gpt-4o": { provider: "openai", maxTokens: 4096 },
+//   "gpt-4o-mini": { provider: "openai", maxTokens: 4096 },
+
+//   // Claude
+//   "claude-opus-4-1": { provider: "claude", maxTokens: 4096 },
+//   "claude-opus-4": { provider: "claude", maxTokens: 4096 },
+//   "claude-sonnet-4": { provider: "claude", maxTokens: 4096 },
+//   // "claude-3-5-sonnet-v2": { provider: "claude", maxTokens: 8192 },
+
+//   // Gemini
+//   // "gemini-2.0-flash": { provider: "gemini", maxTokens: 8192 },
+//   "gemini-2.5-flash": { provider: "gemini", maxTokens: 8192 },
+//   "gemini-2.5-pro": { provider: "gemini", maxTokens: 8192 },
+// };

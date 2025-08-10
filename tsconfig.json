@@ -1,14 +1,20 @@
 {
   "compilerOptions": {
-    "target": "ES2020",         /* 자바스크립트 버전 설정 */
-    "module": "NodeNext",        /* Node.js 최신 모듈 시스템 사용 */
-    "moduleResolution": "NodeNext",
-    "outDir": "./dist",          /* 컴파일된 JS 파일이 저장될 폴더 */
-    "rootDir": "./src",          /* 타입스크립트 소스 코드 폴더 */
+    "target": "ES2020",
+    "module": "commonjs",
+    "lib": ["ES2020"],
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "strict": true,
     "esModuleInterop": true,
+    "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "strict": true,              /* 엄격한 타입 체크 활성화 */
-    "skipLibCheck": true
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "types": ["node", "jest"], // Jest 타입 추가
+    "resolveJsonModule": true
   },
-  "include": ["src/**/*"]      /* 컴파일할 폴더 지정 */
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "**/*.test.ts"]
 }

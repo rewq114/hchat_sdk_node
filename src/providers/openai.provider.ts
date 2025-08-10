@@ -1,114 +1,112 @@
-import { AzureOpenAI } from 'openai';
-import { BaseProvider } from './base.provider';
-import { 
-  ChatRequest, 
-  ChatResponse, 
-  StreamChunk, 
-  HChatAPIError 
-} from '../types';
+// src/providers/openai.provider.ts
+import { AzureOpenAI } from "openai";
+import { BaseProvider } from "./base.provider";
+import { ChatRequest, StreamChunk, Message } from "../types";
 
 export class OpenAIProvider extends BaseProvider {
   private client: AzureOpenAI;
 
   constructor(config: any) {
     super(config);
-    
+
     this.client = new AzureOpenAI({
       endpoint: this.baseUrl,
       apiKey: this.config.apiKey,
-      apiVersion: '2024-10-21'
+      apiVersion: "2024-10-21",
     });
   }
 
-  async chat(request: ChatRequest): Promise<ChatResponse> {
-    this.log('Chat request:', request.model);
-    
-    try {
-      const openAIParams = this.convertToOpenAIFormat(request);
-      const response = await this.client.chat.completions.create(openAIParams);
-      
-      return this.normalizeResponse(response, request.model);
-    } catch (error: any) {
-      throw this.handleError(error);
-    }
-  }
-
   async *stream(request: ChatRequest): AsyncIterable<StreamChunk> {
-    this.log('Stream request:', request.model);
-    
     try {
-      const openAIParams = this.convertToOpenAIFormat(request);
-      openAIParams.stream = true;
-      
-      const stream = await this.client.chat.completions.create(openAIParams);
-      
+      const openAIParams = this.convertToProviderInputformat(request);
+
+      // 스트림을 명시적으로 생성
+      const response = this.client.chat.completions.create({
+        ...openAIParams,
+        stream: true,
+      });
+
+      // response가 Stream인지 확인하고 처리
+      const stream = await response;
+
+      // @ts-ignore (타입 체크 우회)
       for await (const chunk of stream) {
-        yield this.normalizeChunk(chunk);
+        yield chunk as StreamChunk;
       }
     } catch (error: any) {
+      this.log("Error in GPT stream:", error);
       throw this.handleError(error);
     }
   }
 
-  private convertToOpenAIFormat(request: ChatRequest): any {
+  protected convertToProviderInputformat(request: ChatRequest): any {
     const params: any = {
       model: request.model,
-      messages: request.messages,
-      max_tokens: request.max_tokens,
-      temperature: request.temperature,
-      top_p: request.top_p,
-      frequency_penalty: request.frequency_penalty,
-      presence_penalty: request.presence_penalty,
-      stop: request.stop,
-      stream: false,
-      tools: request.tools,
-      tool_choice: request.tool_choice,
-      response_format: request.response_format,
+      instructions: request.system,
+      messages: this.convertMessages(request.content),
+      max_tokens: request.max_tokens || 1000,
+      temperature: request.temperature || 0.7,
     };
+
+    // Tools 처리
+    if (request.tools && request.tools.length > 0) {
+      params.tools = request.tools;
+    }
 
     // 고급 설정 적용
     if (request.advanced?.openai) {
       Object.assign(params, request.advanced.openai);
     }
 
-    // undefined 제거
+    // undefined 값 제거
     return Object.fromEntries(
       Object.entries(params).filter(([_, v]) => v !== undefined)
     );
   }
 
-  private normalizeResponse(response: any, model: string): ChatResponse {
-    return {
-      id: response.id,
-      object: 'chat.completion',
-      created: response.created,
-      model: model,
-      choices: response.choices,
-      usage: response.usage,
-      metadata: {
-        provider: 'openai'
+  private convertMessages(messages: Message[]): any[] {
+    // 메시지 형식 변환 (필요한 경우)
+    return messages.map((msg) => {
+      if (typeof msg.content === "string") {
+        return msg;
       }
-    };
+
+      // 멀티모달 메시지 처리
+      if (Array.isArray(msg.content)) {
+        return {
+          role: msg.role,
+          content: msg.content.map((item: any) => {
+            if (item.type === "text") {
+              return { type: "text", text: item.text };
+            } else if (item.type === "image") {
+              return {
+                type: "image_url",
+                image_url: item.image_url,
+              };
+            }
+            return item;
+          }),
+        };
+      }
+
+      return msg;
+    });
   }
 
-  private normalizeChunk(chunk: any): StreamChunk {
-    return chunk as StreamChunk;
-  }
-
-  private handleError(error: any): HChatAPIError {
+  private handleError(error: any): Error {
     const status = error.status || 500;
-    let code: any = 'server_error';
-    
-    if (status === 401) code = 'invalid_api_key';
-    else if (status === 429) code = 'rate_limit_exceeded';
-    else if (status === 400) code = 'invalid_request';
-    
-    return new HChatAPIError(
-      code,
-      error.message,
-      status,
-      'openai',
-      error
-    );
+    let message = error.message || "Unknown error";
+
+    if (status === 401) {
+      message = "Invalid API key";
+    } else if (status === 429) {
+      message = "Rate limit exceeded";
+    } else if (status === 400) {
+      message = "Invalid request";
+    }
+
+    this.log("OpenAI API Error:", { status, message, error });
+
+    return new Error(`OpenAI API Error (${status}): ${message}`);
   }
 }

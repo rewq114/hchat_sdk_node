@@ -1,247 +1,222 @@
-import Anthropic from '@anthropic-ai/sdk';
-import { BaseProvider } from './base.provider';
-import { 
-  ChatRequest, 
-  ChatResponse, 
-  StreamChunk,
-  Message,
-  HChatAPIError 
-} from '../types';
-
+// src/providers/claude.provider.ts
+import { BaseProvider } from "./base.provider";
+import { ChatRequest, StreamChunk, Message } from "../types";
+import { parseSSEStream } from "../utils/sse-parser";
 export class ClaudeProvider extends BaseProvider {
-  private client: Anthropic;
+  // TODO : 다듬기 필요
+  private isInThinkingBlock = false;
+  private thinkingStarted = false;
 
-  constructor(config: any) {
-    super(config);
-    
-    // Interceptor를 사용한 URL 재작성
-    this.client = new Anthropic({
-      apiKey: 'dummy', // 실제 키는 fetch interceptor에서 사용
-      fetch: this.createHChatFetch()
-    });
-  }
-
-  private createHChatFetch() {
-    return async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = input.toString();
-      
-      // Anthropic URL을 H-Chat URL로 변경
-      const hChatUrl = url.replace(
-        'https://api.anthropic.com/v1',
-        `${this.baseUrl}/claude`
-      );
-      
-      const headers = new Headers();
-      headers.set('Content-Type', 'application/json');
-      headers.set('Authorization', this.config.apiKey);
-      
-      const newInit = {
-        ...init,
-        headers
-      };
-      
-      this.log('Claude API call:', hChatUrl);
-      
-      return fetch(hChatUrl, newInit);
-    };
-  }
-
-  async chat(request: ChatRequest): Promise<ChatResponse> {
-    this.log('Chat request:', request.model);
-    
+  async chat(request: ChatRequest): Promise<any> {
     try {
-      const claudeParams = this.convertToClaudeFormat(request);
-      const response = await this.client.messages.create(claudeParams);
-      
-      return this.normalizeResponse(response, request.model);
+      const claudeParams = this.convertToProviderInputformat(request);
+
+      const response = await fetch(`${this.baseUrl}/claude/messages`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: this.config.apiKey,
+        },
+        body: JSON.stringify({
+          ...claudeParams,
+          stream: false,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(
+          `${response.status} ${response.statusText} - ${errorText}`
+        );
+      }
+
+      const data: any = await response.json();
+
+      return {
+        content: data.content?.[0]?.text || data.message || "",
+        usage: data.usage,
+      };
     } catch (error: any) {
+      this.log("Error in Claude chat:", error);
       throw this.handleError(error);
     }
   }
 
   async *stream(request: ChatRequest): AsyncIterable<StreamChunk> {
-    this.log('Stream request:', request.model);
-    
     try {
-      const claudeParams = this.convertToClaudeFormat(request);
-      claudeParams.stream = true;
-      
-      const stream = await this.client.messages.create(claudeParams);
-      
-      for await (const chunk of stream) {
-        yield this.normalizeChunk(chunk, request.model);
+      const claudeParams = this.convertToProviderInputformat(request);
+
+      const response = await fetch(`${this.baseUrl}/claude/messages`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: this.config.apiKey,
+        },
+        body: JSON.stringify({
+          ...claudeParams,
+          stream: true,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(`Claude API error: ${response.status} - ${error}`);
+      }
+
+      for await (const data of parseSSEStream(response)) {
+        // this.log("", data);
+        const chunk = this.convertAnthropicChunk(data, request.model);
+
+        if (chunk) yield chunk;
       }
     } catch (error: any) {
+      this.log("Error in Claude stream:", error);
       throw this.handleError(error);
     }
   }
 
-  private convertToClaudeFormat(request: ChatRequest): any {
-    // System 메시지 분리
-    const systemMessage = request.messages.find(m => m.role === 'system');
-    const nonSystemMessages = request.messages.filter(m => m.role !== 'system');
-    
+  protected convertToProviderInputformat(request: ChatRequest): any {
     const params: any = {
       model: request.model,
-      messages: this.convertMessages(nonSystemMessages),
-      max_tokens: request.max_tokens || 1000,
+      system: request.system,
+      messages: this.convertMessages(request.content),
+      max_tokens: request.max_tokens,
       temperature: request.temperature,
-      top_p: request.top_p,
-      stop_sequences: Array.isArray(request.stop) ? request.stop : 
-                      request.stop ? [request.stop] : undefined,
-      stream: false,
     };
 
-    // System 메시지 처리
-    if (systemMessage) {
-      params.system = typeof systemMessage.content === 'string' 
-        ? systemMessage.content 
-        : systemMessage.content[0].text;
-    }
-
     // Tool 처리
-    if (request.tools) {
-      params.tools = request.tools.map(tool => ({
-        name: tool.function.name,
-        description: tool.function.description,
-        input_schema: tool.function.parameters
-      }));
+    if (request.tools && request.tools.length > 0) {
+      params.tools = request.tools;
     }
 
-    // 고급 설정
-    if (request.advanced?.claude) {
-      if (request.advanced.claude.reasoning) {
-        // Claude의 reasoning 모드 활성화
-        params.metadata = {
-          ...params.metadata,
-          ...request.advanced.claude.metadata
-        };
-      }
+    // 고급 설정 (Claude reasoning 등)
+    if (request.thinking) {
+      params.thinking = {
+        type: "enabled",
+        budget_tokens: request.max_tokens ? request.max_tokens / 2 : 4096,
+      };
+      params.temperature = 1;
     }
 
     return params;
   }
 
   private convertMessages(messages: Message[]): any[] {
-    return messages.map(msg => ({
-      role: msg.role === 'assistant' ? 'assistant' : 'user',
-      content: this.convertContent(msg.content)
+    return messages.map((msg) => ({
+      role: msg.role,
+      content: this.convertContent(msg.content),
     }));
   }
 
   private convertContent(content: any): any {
-    if (typeof content === 'string') {
+    if (typeof content === "string") {
       return content;
     }
-    
+
     if (Array.isArray(content)) {
-      return content.map(item => {
-        if (item.type === 'text') {
-          return { type: 'text', text: item.text };
-        } else if (item.type === 'image') {
+      return content.map((item) => {
+        if (item.type === "text") {
+          return { type: "text", text: item.text };
+        } else if (item.type === "image") {
+          // base64 이미지 처리
+          const base64Data = item.image_url.url.includes("base64,")
+            ? item.image_url.url.split(",")[1]
+            : item.image_url.url;
+
           return {
-            type: 'image',
+            type: "image",
             source: {
-              type: 'base64',
-              media_type: 'image/jpeg',
-              data: item.image_url.url.split(',')[1]
-            }
+              type: "base64",
+              media_type: "image/jpeg",
+              data: base64Data,
+            },
           };
         }
         return item;
       });
     }
-    
+
     return content;
   }
 
-  private normalizeResponse(response: any, model: string): ChatResponse {
-    const content = response.content || [];
-    const textContent = content.find((c: any) => c.type === 'text')?.text || '';
-    const toolCalls = content
-      .filter((c: any) => c.type === 'tool_use')
-      .map((c: any) => ({
-        id: c.id,
-        type: 'function' as const,
-        function: {
-          name: c.name,
-          arguments: JSON.stringify(c.input)
-        }
-      }));
-
-    return {
-      id: this.createId(),
-      object: 'chat.completion',
-      created: this.getCurrentTimestamp(),
-      model: model,
-      choices: [{
-        index: 0,
-        message: {
-          role: 'assistant',
-          content: textContent,
-          tool_calls: toolCalls.length > 0 ? toolCalls : undefined
-        },
-        finish_reason: this.mapFinishReason(response.stop_reason)
-      }],
-      usage: {
-        prompt_tokens: response.usage?.input_tokens || 0,
-        completion_tokens: response.usage?.output_tokens || 0,
-        total_tokens: (response.usage?.input_tokens || 0) + 
-                     (response.usage?.output_tokens || 0)
-      },
-      metadata: {
-        provider: 'claude',
-        cache_tokens: response.usage?.cache_creation_input_tokens
-      }
-    };
-  }
-
-  private normalizeChunk(chunk: any, model: string): StreamChunk {
-    // Claude 스트림 청크 변환
+  private convertAnthropicChunk(event: any, model: string): StreamChunk | null {
     const delta: any = {};
-    
-    if (chunk.type === 'content_block_delta') {
-      if (chunk.delta?.text) {
-        delta.content = chunk.delta.text;
+
+    // thinking 블록 상태 추적 (클래스 변수로 선언 필요)
+    if (!this.isInThinkingBlock) this.isInThinkingBlock = false;
+    if (!this.thinkingStarted) this.thinkingStarted = false;
+
+    if (event.type === "content_block_start") {
+      if (event.content_block?.type === "thinking") {
+        this.isInThinkingBlock = true;
+        this.thinkingStarted = false;
+        return null; // 시작 이벤트는 스킵
+      }
+      return null;
+    }
+
+    if (event.type === "content_block_stop") {
+      if (this.isInThinkingBlock) {
+        this.isInThinkingBlock = false;
+        this.thinkingStarted = false;
+        // thinking 블록 종료 마커
+        delta.content = "[/THINKING]\n";
+      } else {
+        return null;
       }
     }
 
+    if (event.type === "content_block_delta") {
+      if (event.delta?.type === "thinking_delta" && event.delta?.thinking) {
+        if (!this.thinkingStarted) {
+          // 첫 번째 thinking 델타 - 시작 마커 추가
+          delta.content = "[THINKING]" + event.delta.thinking;
+          this.thinkingStarted = true;
+        } else {
+          delta.content = event.delta.thinking;
+        }
+      } else if (event.delta?.type === "text_delta" && event.delta?.text) {
+        delta.content = event.delta.text;
+      } else {
+        return null;
+      }
+    }
+
+    if (event.type === "message_stop") {
+      return {
+        id: crypto.randomUUID(),
+        object: "chat.completion.chunk",
+        created: Date.now(),
+        model,
+        choices: [{ index: 0, delta: {}, finish_reason: "stop" }],
+      };
+    }
+
+    if (!delta.content) return null;
+
     return {
-      id: this.createId(),
-      object: 'chat.completion.chunk',
-      created: this.getCurrentTimestamp(),
-      model: model,
-      choices: [{
-        index: 0,
-        delta,
-        finish_reason: chunk.type === 'message_stop' ? 'stop' : null
-      }]
+      id: crypto.randomUUID(),
+      object: "chat.completion.chunk",
+      created: Date.now(),
+      model,
+      choices: [{ index: 0, delta, finish_reason: null }],
     };
   }
 
-  private mapFinishReason(stopReason: string): any {
-    switch (stopReason) {
-      case 'end_turn': return 'stop';
-      case 'max_tokens': return 'length';
-      case 'tool_use': return 'tool_calls';
-      default: return 'stop';
-    }
-  }
-
-  private handleError(error: any): HChatAPIError {
+  private handleError(error: any): Error {
     const status = error.status || 500;
-    let code: any = 'server_error';
-    
-    if (status === 401) code = 'invalid_api_key';
-    else if (status === 429) code = 'rate_limit_exceeded';
-    else if (status === 400) code = 'invalid_request';
-    
-    return new HChatAPIError(
-      code,
-      error.message,
-      status,
-      'claude',
-      error
-    );
+    let message = error.message || "Unknown error";
+
+    if (status === 401) {
+      message = "Invalid API key";
+    } else if (status === 429) {
+      message = "Rate limit exceeded";
+    } else if (status === 400) {
+      message = "Invalid request";
+    }
+
+    this.log("Claude API Error:", { status, message, error });
+
+    return new Error(`Claude API Error (${status}): ${message}`);
   }
 }

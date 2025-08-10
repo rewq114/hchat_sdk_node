@@ -1,50 +1,50 @@
-import { Message, ToolDefinition } from './message.types';
+// 통합 요청 타입
+export interface UnifiedRequest {
+  model: string;
+  system: string;
+  content: UnifiedContent;
+  mcpServers?: string[];
+  thinking?: boolean;
+}
+
+export interface UnifiedContent {
+  text: string;
+  images?: string[]; // base64 or URLs
+  files?: Array<{
+    name: string;
+    content: string;
+  }>;
+}
 
 export interface ChatRequest {
-  // 필수
   model: string;
-  messages: Message[];
-  
-  // 공통 옵션
+  system: string;
+  content: Message[];
+  stream?: boolean;
+  thinking?: boolean;
   max_tokens?: number;
   temperature?: number;
-  top_p?: number;
-  frequency_penalty?: number;
-  presence_penalty?: number;
-  stop?: string | string[];
-  stream?: boolean;
-  
-  // Tool calling
   tools?: ToolDefinition[];
-  tool_choice?: 'auto' | 'none' | { type: 'function'; function: { name: string } };
-  
-  // Response format
-  response_format?: {
-    type: 'text' | 'json_object' | 'json_schema';
-    json_schema?: Record<string, any>;
+  advanced?: any;
+}
+
+export interface Message {
+  role: "system" | "user" | "assistant" | "tool";
+  content: string | MessageContent[];
+  tool_call_id?: string;
+}
+
+export interface MessageContent {
+  type: "text" | "image";
+  text?: string;
+  image_url?: {
+    url: string;
+    detail?: "low" | "high" | "auto";
   };
-  
-  // 프로바이더별 고급 설정
-  advanced?: {
-    openai?: {
-      seed?: number;
-      logit_bias?: Record<string, number>;
-      logprobs?: boolean;
-      top_logprobs?: number;
-    };
-    claude?: {
-      reasoning?: boolean;
-      metadata?: {
-        user_id?: string;
-      };
-    };
-    gemini?: {
-      thinking_mode?: boolean;
-      thinking_budget?: number;
-      safety_settings?: Array<{
-        category: string;
-        threshold: string;
-      }>;
-    };
-  };
+}
+
+export interface ToolDefinition {
+  name: string;
+  description: string;
+  parameters?: object;
 }
