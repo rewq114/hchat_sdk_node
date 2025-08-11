@@ -8,11 +8,10 @@ import {
   RequestMessage,
 } from "./types";
 import { BaseProvider } from "./providers/base.provider";
-import { OpenAIProvider } from "./providers/openai.provider";
-import { ClaudeProvider } from "./providers/claude.provider";
-import { GeminiProvider } from "./providers/gemini.provider";
+import { OpenAIProvider } from "./providers/openai";
+import { ClaudeProvider } from "./providers/claude";
+import { GeminiProvider } from "./providers/gemini";
 import { getModelProvider } from "./utils/model";
-import { parseFeatureError } from "./utils/feature-support";
 
 export class HChat {
   private providers: Map<string, BaseProvider> = new Map();
@@ -58,27 +57,11 @@ export class HChat {
       tools: request.tools.length > 0 ? request.tools : undefined,
       advanced: request.advanced ? request.advanced : undefined,
     };
-
     try {
       return await provider.chat(providerRequest);
     } catch (error) {
-      this.log(`Error in chat: ${error}`); // 기능 관련 에러인 경우 더 명확한 메시지 제공
-      const featureError = parseFeatureError(error);
-      if (featureError) {
-        const enhancedError = new Error(
-          `${featureError.message}\n💡 ${featureError.suggestion}`
-        );
-        // 원본 에러는 stack에만 남기고 사용자에게는 보여주지 않음
-        if (this.config.debug) {
-          this.log("Original error:", error);
-        }
-        (enhancedError as any).code = featureError.code;
-        (enhancedError as any).feature = featureError.feature;
-        (enhancedError as any).model = featureError.model;
-        (enhancedError as any).originalError = error;
-        throw enhancedError;
-      }
-
+      this.log(`Error in chat: ${error}`);
+      // Provider에서 이미 처리된 에러를 그대로 전달
       throw error;
     }
   }
@@ -136,23 +119,8 @@ export class HChat {
         }
       }
     } catch (error) {
-      this.log(`Error in stream: ${error}`); // 기능 관련 에러인 경우 더 명확한 메시지 제공
-      const featureError = parseFeatureError(error);
-      if (featureError) {
-        const enhancedError = new Error(
-          `${featureError.message}\n💡 ${featureError.suggestion}`
-        );
-        // 원본 에러는 stack에만 남기고 사용자에게는 보여주지 않음
-        if (this.config.debug) {
-          this.log("Original error:", error);
-        }
-        (enhancedError as any).code = featureError.code;
-        (enhancedError as any).feature = featureError.feature;
-        (enhancedError as any).model = featureError.model;
-        (enhancedError as any).originalError = error;
-        throw enhancedError;
-      }
-
+      this.log(`Error in stream: ${error}`);
+      // Provider에서 이미 처리된 에러를 그대로 전달
       throw error;
     }
   }

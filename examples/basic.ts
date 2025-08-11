@@ -182,11 +182,11 @@ async function chatWithToolsExample(model: string = "gpt-4.1") {
 
 async function runExamples() {
   // 모델 선택
-  const model = "gpt-4.1";
+  // const model = "gpt-4.1";
   // const model = "gpt-4o";
   // const model = "gemini-2.5-flash";
   // const model = "gemini-2.5-pro";
-  // const model = "claude-sonnet-4";
+  const model = "claude-sonnet-4";
   // const model = "claude-opus-4";
 
   console.log(`\n🚀 Testing with model: ${model}\n`);

@@ -1,10 +1,14 @@
+import { dot } from "node:test/reporters";
 import { ChatRequest, HChat, RequestMessage } from "../src";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 // Tool calling example with all providers
 async function toolUseExample() {
   const client = new HChat({
     apiKey: process.env.HCHAT_API_KEY!,
-    debug: true,
+    debug: false,
   });
 
   // Test different models
