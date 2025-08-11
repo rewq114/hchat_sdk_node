@@ -14,7 +14,7 @@
 ## 설치
 
 ```bash
-npm install h-chat-sdk
+npm install @rewq114/h-chat-sdk
 ```
 
 ## 환경 설정
@@ -30,7 +30,7 @@ HCHAT_API_KEY=your_api_key_here
 ### 기본 사용법 (간단한 string 입력)
 
 ```typescript
-import { HChat } from "h-chat-sdk";
+import { HChat } from "@rewq114/h-chat-sdk";
 
 const client = new HChat({
   apiKey: process.env.HCHAT_API_KEY,

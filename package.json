@@ -1,11 +1,33 @@
 {
-  "name": "@your-org/hchat-sdk",
-  "version": "1.0.0",
+  "name": "@rewq114/h-chat-sdk",
+  "version": "0.1.0",
+  "description": "TypeScript SDK for Hyundai Motor Group H-Chat API",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "files": [
+    "dist/**/*",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rewq114/hchat_sdk_node.git"
+  },
+  "keywords": [
+    "hchat",
+    "hyundai",
+    "ai",
+    "chatbot",
+    "sdk",
+    "typescript"
+  ],
+  "author": "rewq114",
+  "license": "MIT",
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "npm run clean && npm run build && npm run test",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",

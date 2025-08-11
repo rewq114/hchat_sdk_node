@@ -1,0 +1,36 @@
+# Source files
+src/
+examples/
+test/
+
+# Config files
+tsconfig.json
+jest.config.js
+.env
+.env.example
+
+# Development files
+*.ts
+!*.d.ts
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Dependencies
+node_modules/
+
+# Test coverage
+coverage/
+
+# Misc
+.DS_Store
+*.tgz
