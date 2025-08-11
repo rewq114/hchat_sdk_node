@@ -11,7 +11,6 @@ export interface MCPManager {
 
 export interface HChatConfig {
   apiKey: string;
-  baseUrl?: string;
   timeout?: number;
   debug?: boolean;
 }

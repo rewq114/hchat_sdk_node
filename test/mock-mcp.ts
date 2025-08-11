@@ -66,10 +66,41 @@ export class MockMCPManager implements MCPManager {
     toolName: string,
     args: any
   ): Promise<any> {
-    // Mock 응답
-    if (serverName === "filesystem" && toolName === "read_file") {
-      return { content: "File content here..." };
+    const serverTools = this.tools.get(serverName);
+    if (!serverTools) {
+      throw new Error(`Server ${serverName} not found`);
     }
-    return { success: true, data: "Mock response" };
+
+    const tool = serverTools.find((t) => t.name === toolName);
+    if (!tool) {
+      throw new Error(`Tool ${toolName} not found in ${serverName}`);
+    }
+
+    // Simulate tool execution
+    switch (toolName) {
+      case "read_file":
+        return {
+          content: `Mock content of ${args.path}`,
+        };
+      case "write_file":
+        return {
+          success: true,
+          path: args.path,
+        };
+      case "status":
+        return {
+          branch: "main",
+          changes: [],
+        };
+      case "list_issues":
+        return {
+          issues: [
+            { id: "PROJ-123", title: "Test issue" },
+            { id: "PROJ-124", title: "Another issue" },
+          ],
+        };
+      default:
+        return { result: "Mock result" };
+    }
   }
 }

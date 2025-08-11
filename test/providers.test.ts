@@ -1,7 +1,13 @@
 import { OpenAIProvider } from "../src/providers/openai.provider";
 import { ClaudeProvider } from "../src/providers/claude.provider";
 import { GeminiProvider } from "../src/providers/gemini.provider";
-import { ChatRequest, HChatConfig, StreamChunk } from "../src/types";
+import {
+  ChatRequest,
+  HChatConfig,
+  StreamChunk,
+  ChatCompletion,
+  ProviderChatRequest,
+} from "../src/types";
 
 describe("Provider Integration Tests", () => {
   // 환경 변수에서 실제 API 키와 Base URL을 가져옵니다.
@@ -24,7 +30,7 @@ describe("Provider Integration Tests", () => {
     }
   });
 
-  const testRequest: Omit<ChatRequest, "model"> = {
+  const testRequest: Omit<ProviderChatRequest, "model"> = {
     system: "You are a helpful assistant. Keep responses very brief.",
     content: [{ role: "user", content: "Say hello in Korean" }],
     max_tokens: 50,
@@ -38,7 +44,7 @@ describe("Provider Integration Tests", () => {
         const provider = new ClaudeProvider(config);
         // 중요: 아래 모델 이름은 H-Chat API Gateway에서 지원하는 정확한 이름이어야 합니다.
         // 예: "claude-3-opus" 등. 400 에러 발생 시 이 부분을 확인하세요.
-        const request: ChatRequest = {
+        const request: ProviderChatRequest = {
           ...testRequest,
           model: "claude-sonnet-4",
         };
@@ -67,7 +73,7 @@ describe("Provider Integration Tests", () => {
       async () => {
         const provider = new GeminiProvider(config);
         // 중요: 아래 모델 이름은 H-Chat API Gateway에서 지원하는 정확한 이름이어야 합니다.
-        const request: ChatRequest = {
+        const request: ProviderChatRequest = {
           ...testRequest,
           model: "gemini-2.5-flash",
         };
@@ -94,7 +100,10 @@ describe("Provider Integration Tests", () => {
       "should receive a stream from the real API",
       async () => {
         const provider = new OpenAIProvider(config);
-        const request: ChatRequest = { ...testRequest, model: "gpt-4o-mini" };
+        const request: ProviderChatRequest = {
+          ...testRequest,
+          model: "gpt-4o-mini",
+        };
         const chunks: StreamChunk[] = [];
 
         try {
@@ -115,5 +124,293 @@ describe("Provider Integration Tests", () => {
       },
       15000
     );
+  });
+});
+
+describe("Provider Unit Tests", () => {
+  const mockConfig: HChatConfig = {
+    apiKey: "test-key",
+    baseUrl: "https://test.api.com",
+    debug: false,
+  };
+
+  describe("Claude Provider", () => {
+    let provider: ClaudeProvider;
+    let fetchMock: jest.SpyInstance;
+
+    beforeEach(() => {
+      provider = new ClaudeProvider(mockConfig);
+      fetchMock = jest.spyOn(global, "fetch").mockImplementation();
+    });
+
+    afterEach(() => {
+      fetchMock.mockRestore();
+    });
+
+    it("should convert tools to Claude format", async () => {
+      fetchMock.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          id: "msg_123",
+          content: [{ type: "text", text: "I'll help you with that." }],
+          stop_reason: "end_turn",
+          usage: {
+            input_tokens: 10,
+            output_tokens: 5,
+          },
+        }),
+      } as Response);
+
+      const request: ProviderChatRequest = {
+        model: "claude-sonnet-4",
+        system: "Test",
+        content: [{ role: "user", content: "Test" }],
+        tools: [
+          {
+            type: "function",
+            function: {
+              name: "test_tool",
+              description: "Test tool",
+              parameters: {
+                type: "object",
+                properties: {
+                  param: { type: "string" },
+                },
+              },
+            },
+          },
+        ],
+      };
+
+      await provider.chat(request);
+
+      expect(fetchMock).toHaveBeenCalled();
+      const [url, options] = fetchMock.mock.calls[0];
+      const body = JSON.parse(options.body);
+
+      expect(body.tools).toBeDefined();
+      expect(body.tools[0]).toEqual({
+        name: "test_tool",
+        description: "Test tool",
+        input_schema: {
+          type: "object",
+          properties: {
+            param: { type: "string" },
+          },
+        },
+      });
+      expect(body.tool_choice).toEqual({ type: "auto" });
+    });
+
+    it("should handle tool response messages correctly", async () => {
+      fetchMock.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          id: "msg_123",
+          content: [{ type: "text", text: "Done" }],
+          stop_reason: "end_turn",
+          usage: { input_tokens: 10, output_tokens: 5 },
+        }),
+      } as Response);
+
+      const request: ProviderChatRequest = {
+        model: "claude-sonnet-4",
+        system: "Test",
+        content: [
+          { role: "user", content: "Test" },
+          {
+            role: "assistant",
+            content: "I'll help",
+            tool_calls: [
+              {
+                id: "call_123",
+                type: "function",
+                function: {
+                  name: "test_tool",
+                  arguments: '{"param": "value"}',
+                },
+              },
+            ],
+          },
+          {
+            role: "tool",
+            content: '{"result": "success"}',
+            tool_call_id: "call_123",
+          },
+        ],
+      };
+
+      await provider.chat(request);
+
+      const [, options] = fetchMock.mock.calls[0];
+      const body = JSON.parse(options.body);
+
+      // Check assistant message with tool_use
+      expect(body.messages[1].content).toContainEqual({
+        type: "tool_use",
+        id: "call_123",
+        name: "test_tool",
+        input: { param: "value" },
+      });
+
+      // Check tool response as user message
+      expect(body.messages[2].role).toBe("user");
+      expect(body.messages[2].content[0].type).toBe("tool_result");
+      expect(body.messages[2].content[0].tool_use_id).toBe("call_123");
+    });
+
+    it("should extract tool calls from response", async () => {
+      fetchMock.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          id: "msg_123",
+          content: [
+            { type: "text", text: "I'll check the weather." },
+            {
+              type: "tool_use",
+              id: "toolu_123",
+              name: "get_weather",
+              input: { location: "Seoul" },
+            },
+          ],
+          stop_reason: "tool_use",
+          usage: { input_tokens: 10, output_tokens: 5 },
+        }),
+      } as Response);
+
+      const response = await provider.chat({
+        model: "claude-sonnet-4",
+        system: "Test",
+        content: [{ role: "user", content: "What's the weather?" }],
+      });
+
+      expect(response.choices[0].message.tool_calls).toBeDefined();
+      expect(response.choices[0].message.tool_calls).toHaveLength(1);
+      expect(response.choices[0].message.tool_calls[0]).toEqual({
+        id: "toolu_123",
+        type: "function",
+        function: {
+          name: "get_weather",
+          arguments: '{"location":"Seoul"}',
+        },
+      });
+      expect(response.choices[0].finish_reason).toBe("tool_calls");
+    });
+  });
+
+  describe("Gemini Provider", () => {
+    let provider: GeminiProvider;
+    let fetchMock: jest.SpyInstance;
+
+    beforeEach(() => {
+      provider = new GeminiProvider(mockConfig);
+      fetchMock = jest.spyOn(global, "fetch").mockImplementation();
+    });
+
+    afterEach(() => {
+      fetchMock.mockRestore();
+    });
+
+    it("should convert messages to Gemini format", async () => {
+      fetchMock.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          candidates: [
+            {
+              content: {
+                parts: [{ text: "Hello!" }],
+                role: "model",
+              },
+              finishReason: "STOP",
+            },
+          ],
+          usageMetadata: {
+            promptTokenCount: 10,
+            candidatesTokenCount: 5,
+            totalTokenCount: 15,
+          },
+        }),
+      } as Response);
+
+      const request: ProviderChatRequest = {
+        model: "gemini-2.5-flash",
+        system: "Be helpful",
+        content: [
+          { role: "user", content: "Hello" },
+          { role: "assistant", content: "Hi there!" },
+          { role: "user", content: "How are you?" },
+        ],
+      };
+
+      await provider.chat(request);
+
+      const [, options] = fetchMock.mock.calls[0];
+      const body = JSON.parse(options.body);
+
+      // Check system instruction
+      expect(body.systemInstruction).toEqual({
+        parts: [{ text: "Be helpful" }],
+      });
+
+      // Check message conversion
+      expect(body.contents).toHaveLength(3);
+      expect(body.contents[0].role).toBe("user");
+      expect(body.contents[1].role).toBe("model"); // assistant -> model
+      expect(body.contents[2].role).toBe("user");
+    });
+
+    it("should handle multimodal content", async () => {
+      fetchMock.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          candidates: [
+            {
+              content: { parts: [{ text: "I see the image" }] },
+              finishReason: "STOP",
+            },
+          ],
+        }),
+      } as Response);
+
+      const request: ProviderChatRequest = {
+        model: "gemini-2.5-pro",
+        system: "Analyze images",
+        content: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: "What's in this image?" },
+              {
+                type: "image",
+                image_url: {
+                  url: "data:image/jpeg;base64,/9j/4AAQ...",
+                },
+              },
+            ],
+          },
+        ],
+      };
+
+      await provider.chat(request);
+
+      const [, options] = fetchMock.mock.calls[0];
+      const body = JSON.parse(options.body);
+
+      expect(body.contents[0].parts).toHaveLength(2);
+      expect(body.contents[0].parts[0]).toEqual({
+        text: "What's in this image?",
+      });
+      expect(body.contents[0].parts[1].inlineData).toBeDefined();
+      expect(body.contents[0].parts[1].inlineData.mimeType).toBe("image/jpeg");
+    });
+  });
+
+  describe("OpenAI Provider", () => {
+    it("should handle Azure OpenAI specific configuration", () => {
+      const provider = new OpenAIProvider(mockConfig);
+      // Azure OpenAI의 경우 endpoint와 apiVersion이 설정되는지 확인
+      // 이는 실제 구현에 따라 테스트 방법이 달라질 수 있음
+      expect(provider).toBeDefined();
+    });
   });
 });

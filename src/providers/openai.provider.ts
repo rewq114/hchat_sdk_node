@@ -1,7 +1,12 @@
 // src/providers/openai.provider.ts
 import { AzureOpenAI } from "openai";
 import { BaseProvider } from "./base.provider";
-import { ChatRequest, StreamChunk, Message } from "../types";
+import {
+  ProviderChatRequest,
+  StreamChunk,
+  RequestMessage,
+  ChatCompletion,
+} from "../types";
 
 export class OpenAIProvider extends BaseProvider {
   private client: AzureOpenAI;
@@ -15,8 +20,23 @@ export class OpenAIProvider extends BaseProvider {
       apiVersion: "2024-10-21",
     });
   }
+  async chat(request: ProviderChatRequest): Promise<ChatCompletion> {
+    try {
+      const openAIParams = this.convertToProviderInputformat(request);
 
-  async *stream(request: ChatRequest): AsyncIterable<StreamChunk> {
+      const response = await this.client.chat.completions.create({
+        ...openAIParams,
+        stream: false,
+      });
+
+      return this.convertOpenAICompletion(response, request.model);
+    } catch (error: any) {
+      this.log("Error in OpenAI chat:", error);
+      throw this.handleError(error);
+    }
+  }
+
+  async *stream(request: ProviderChatRequest): AsyncIterable<StreamChunk> {
     try {
       const openAIParams = this.convertToProviderInputformat(request);
 
@@ -27,10 +47,9 @@ export class OpenAIProvider extends BaseProvider {
       });
 
       // response가 Stream인지 확인하고 처리
-      const stream = await response;
-
-      // @ts-ignore (타입 체크 우회)
+      const stream = await response; // @ts-ignore (타입 체크 우회)
       for await (const chunk of stream) {
+        // OpenAI SDK는 이미 StreamChunk 형식으로 반환함
         yield chunk as StreamChunk;
       }
     } catch (error: any) {
@@ -39,7 +58,7 @@ export class OpenAIProvider extends BaseProvider {
     }
   }
 
-  protected convertToProviderInputformat(request: ChatRequest): any {
+  protected convertToProviderInputformat(request: ProviderChatRequest): any {
     const params: any = {
       model: request.model,
       instructions: request.system,
@@ -64,7 +83,7 @@ export class OpenAIProvider extends BaseProvider {
     );
   }
 
-  private convertMessages(messages: Message[]): any[] {
+  private convertMessages(messages: RequestMessage[]): any[] {
     // 메시지 형식 변환 (필요한 경우)
     return messages.map((msg) => {
       if (typeof msg.content === "string") {
@@ -91,6 +110,28 @@ export class OpenAIProvider extends BaseProvider {
 
       return msg;
     });
+  }
+
+  private convertOpenAICompletion(
+    response: any,
+    model: string
+  ): ChatCompletion {
+    return {
+      id: response.id,
+      object: "chat.completion",
+      created: response.created,
+      model: model,
+      choices: response.choices.map((choice: any) => ({
+        index: choice.index,
+        message: {
+          role: choice.message.role,
+          content: choice.message.content,
+          tool_calls: choice.message.tool_calls,
+        },
+        finish_reason: choice.finish_reason,
+      })),
+      usage: response.usage,
+    };
   }
 
   private handleError(error: any): Error {

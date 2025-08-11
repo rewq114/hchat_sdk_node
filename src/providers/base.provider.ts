@@ -1,4 +1,9 @@
-import { ChatRequest, StreamChunk, HChatConfig } from "../types";
+import {
+  ProviderChatRequest,
+  StreamChunk,
+  HChatConfig,
+  ChatCompletion,
+} from "../types";
 
 export abstract class BaseProvider {
   protected config: HChatConfig;
@@ -6,14 +11,17 @@ export abstract class BaseProvider {
 
   constructor(config: HChatConfig) {
     this.config = config;
-    this.baseUrl = config.baseUrl || "https://h-chat-api.autoever.com/v2/api";
+    this.baseUrl = "https://h-chat-api.autoever.com/v2/api";
   }
+  abstract chat(request: ProviderChatRequest): Promise<ChatCompletion>;
 
   // stream으로 응답할 줄 알아야 함
-  abstract stream(request: ChatRequest): AsyncIterable<StreamChunk>;
+  abstract stream(request: ProviderChatRequest): AsyncIterable<StreamChunk>;
 
   // 입력된 값을 Provider에 맞게 변형해야함
-  protected abstract convertToProviderInputformat(request: ChatRequest): any;
+  protected abstract convertToProviderInputformat(
+    request: ProviderChatRequest
+  ): any;
 
   // 출력된 값을 Abstract 가능하게 변형해야함
 
