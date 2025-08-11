@@ -43,7 +43,7 @@ const response = await client.chat({
   content: "Hello! How are you?", // 간단한 string 입력
 });
 
-console.log(response.choices[0].message.content);
+console.log(response.content);
 ```
 
 ### 대화 컨텍스트 관리
@@ -137,9 +137,27 @@ try {
 | temperature | number                     | ❌   | 창의성 수준 0-2 (기본값: 0.7)                |
 | tools       | ToolDefinition[]           | ❌   | 사용 가능한 도구 목록                        |
 
+### ChatCompletion (Response)
+
+기본 응답 구조:
+
+```typescript
+const response = await client.chat({...});
+
+// 편리한 접근 (자동으로 choices[0] 참조)
+response.content        // 응답 텍스트
+response.thinking       // thinking 내용 (Claude/Gemini)
+response.tool_calls     // 호출된 도구 리스트
+response.finish_reason  // 종료 이유
+
+// 고급 사용 (여러 응답 처리)
+response.choices[0]     // 첫 번째 선택지
+response.choices[1]     // 두 번째 선택지 (n > 1일 때)
+```
+
 ## 지원 모델
 
-- **OpenAI**: gpt-4, gpt-4o
+- **OpenAI**: gpt-4.1, gpt-4o
 - **Claude**: claude-sonnet-4, claude-opus-4
 - **Gemini**: gemini-2.5-flash, gemini-2.5-pro
 

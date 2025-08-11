@@ -13,6 +13,7 @@ async function errorHandlingExample() {
     console.log("1. Trying thinking mode with unsupported model...");
     await client.chat({
       model: "gpt-4",
+      system: "your are a helpful ai assistant, boy",
       content: "Hello, can you think about this?",
       thinking: true,
     });
@@ -27,6 +28,7 @@ async function errorHandlingExample() {
     console.log("2. Trying tools with unsupported model...");
     await client.chat({
       model: "gemini-2.5-flash",
+      system: "your are a helpful ai assistant, boy",
       content: "What's the weather?",
       tools: [
         {
@@ -55,13 +57,12 @@ async function errorHandlingExample() {
     console.log("3. Following the suggestion and using supported model...");
     const response = await client.chat({
       model: "claude-sonnet-4",
+      system: "your are a helpful ai assistant, boy",
       content: "Hello! Can you think about what makes a good SDK?",
       thinking: true,
     });
     console.log("✅ Success!");
-    console.log(
-      `Response: ${response.choices[0].message.content?.substring(0, 100)}...`
-    );
+    console.log(`Response: ${response.content.substring(0, 100)}...`);
   } catch (error: any) {
     console.log(`❌ Error: ${error.message}`);
   }

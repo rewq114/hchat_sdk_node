@@ -244,6 +244,7 @@ export class ClaudeProvider extends BaseProvider {
     if (toolCalls.length > 0) {
       message.tool_calls = toolCalls;
     }
+    const finishReason = this.convertFinishReason(response.stop_reason);
 
     return {
       id: response.id || crypto.randomUUID(),
@@ -254,7 +255,7 @@ export class ClaudeProvider extends BaseProvider {
         {
           index: 0,
           message,
-          finish_reason: this.convertFinishReason(response.stop_reason),
+          finish_reason: finishReason,
         },
       ],
       usage: response.usage
@@ -267,6 +268,12 @@ export class ClaudeProvider extends BaseProvider {
             thinking_tokens: response.usage.thinking_tokens,
           }
         : undefined,
+      // Shortcuts
+      message: message,
+      content: content,
+      thinking: thinking || undefined,
+      tool_calls: toolCalls.length > 0 ? toolCalls : undefined,
+      finish_reason: finishReason,
     };
   }
 

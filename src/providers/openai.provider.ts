@@ -111,26 +111,36 @@ export class OpenAIProvider extends BaseProvider {
       return msg;
     });
   }
-
   private convertOpenAICompletion(
     response: any,
     model: string
   ): ChatCompletion {
+    const choices = response.choices.map((choice: any) => ({
+      index: choice.index,
+      message: {
+        role: choice.message.role,
+        content: choice.message.content || "",
+        tool_calls: choice.message.tool_calls,
+      },
+      finish_reason: choice.finish_reason,
+    }));
+
+    // 첫 번째 choice의 정보를 shortcuts로 제공
+    const firstChoice = choices[0];
+
     return {
       id: response.id,
       object: "chat.completion",
       created: response.created,
       model: model,
-      choices: response.choices.map((choice: any) => ({
-        index: choice.index,
-        message: {
-          role: choice.message.role,
-          content: choice.message.content,
-          tool_calls: choice.message.tool_calls,
-        },
-        finish_reason: choice.finish_reason,
-      })),
+      choices: choices,
       usage: response.usage,
+      // Shortcuts
+      message: firstChoice.message,
+      content: firstChoice.message.content,
+      thinking: firstChoice.message.thinking,
+      tool_calls: firstChoice.message.tool_calls,
+      finish_reason: firstChoice.finish_reason,
     };
   }
 

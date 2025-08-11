@@ -1,20 +1,3 @@
-// 통합 요청 타입
-export interface UnifiedRequest {
-  model: string;
-  system: string;
-  content: UnifiedContent;
-  mcpServers?: string[];
-  thinking?: boolean;
-}
-
-export interface UnifiedContent {
-  text: string;
-  images?: string[]; // base64 or URLs
-  files?: Array<{
-    name: string;
-    content: string;
-  }>;
-} // 사용자가 Client에 요청할 때 사용하는 타입 (편의성 제공)
 export interface ChatRequest {
   model: string;
   system: string;

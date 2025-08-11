@@ -15,7 +15,7 @@ async function simpleStringExample() {
     system: "You are a helpful assistant",
     content: "Hello! How are you?", // 간단한 string
   });
-  console.log("Response:", response1.choices[0].message.content);
+  console.log("Response:", response1.content);
 
   console.log("\n" + "=".repeat(60) + "\n");
 
@@ -31,7 +31,8 @@ async function simpleStringExample() {
       },
       {
         role: "assistant",
-        content: "I don't have access to real-time weather data. Could you tell me your location?",
+        content:
+          "I don't have access to real-time weather data. Could you tell me your location?",
       },
       {
         role: "user",
@@ -39,7 +40,7 @@ async function simpleStringExample() {
       },
     ],
   });
-  console.log("Response:", response2.choices[0].message.content);
+  console.log("Response:", response2.content);
 
   console.log("\n" + "=".repeat(60) + "\n");
 

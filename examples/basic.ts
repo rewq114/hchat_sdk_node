@@ -22,9 +22,8 @@ async function basicExample(model: string = "gpt-4.1") {
     ],
   };
   const response = await client.chat(request);
-
   console.log("\n📝 Response:");
-  console.log(response.choices[0].message.content);
+  console.log(response.content);
 
   if (response.usage) {
     console.log("\n📊 Token Usage:");
@@ -74,16 +73,14 @@ async function chatThinkingExample(model: string = "gpt-4.1") {
     ],
     thinking: true,
   };
-  const response = await client.chat(request);
-
-  // Thinking process를 먼저 표시
-  if (response.choices[0].message.thinking) {
+  const response = await client.chat(request); // Thinking process를 먼저 표시
+  if (response.thinking) {
     console.log("\n🤔 Thinking Process:");
-    console.log(response.choices[0].message.thinking);
+    console.log(response.thinking);
   }
 
   console.log("\n📝 Response:");
-  console.log(response.choices[0].message.content);
+  console.log(response.content);
 
   if (response.usage) {
     console.log("\n📊 Token Usage:");
@@ -161,18 +158,16 @@ async function chatWithToolsExample(model: string = "gpt-4.1") {
   };
 
   const response = await client.chat(request);
-
   console.log("\n📝 Response:");
-  const message = response.choices[0].message;
 
-  if (message.tool_calls && message.tool_calls.length > 0) {
+  if (response.tool_calls && response.tool_calls.length > 0) {
     console.log("\n🔧 Tool Calls:");
-    for (const toolCall of message.tool_calls) {
+    for (const toolCall of response.tool_calls) {
       console.log(`  - Function: ${toolCall.function.name}`);
       console.log(`    Arguments: ${toolCall.function.arguments}`);
     }
   } else {
-    console.log(message.content);
+    console.log(response.content);
   }
 
   if (response.usage) {

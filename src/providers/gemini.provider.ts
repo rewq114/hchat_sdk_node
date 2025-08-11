@@ -257,6 +257,7 @@ export class GeminiProvider extends BaseProvider {
         })
       );
     }
+    const finishReason = this.convertGeminiFinishReason(candidate.finishReason);
 
     return {
       id: crypto.randomUUID(),
@@ -267,7 +268,7 @@ export class GeminiProvider extends BaseProvider {
         {
           index: 0,
           message,
-          finish_reason: this.convertGeminiFinishReason(candidate.finishReason),
+          finish_reason: finishReason,
         },
       ],
       usage: data.usageMetadata
@@ -278,6 +279,12 @@ export class GeminiProvider extends BaseProvider {
             thinking_tokens: data.usageMetadata.thinkingTokenCount,
           }
         : undefined,
+      // Shortcuts
+      message: message,
+      content: content,
+      thinking: thinking || undefined,
+      tool_calls: message.tool_calls,
+      finish_reason: finishReason,
     };
   }
 
