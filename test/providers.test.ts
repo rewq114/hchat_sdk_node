@@ -1,6 +1,6 @@
-import { OpenAIProvider } from "../src/providers/openai.provider";
-import { ClaudeProvider } from "../src/providers/claude.provider";
-import { GeminiProvider } from "../src/providers/gemini.provider";
+import { OpenAIProvider } from "../src/providers/openai";
+import { ClaudeProvider } from "../src/providers/claude";
+import { GeminiProvider } from "../src/providers/gemini";
 import { HChatConfig, StreamChunk, ProviderChatRequest } from "../src/types";
 
 describe("Provider Integration Tests", () => {
@@ -271,7 +271,6 @@ describe("Provider Unit Tests", () => {
           usage: { input_tokens: 10, output_tokens: 5 },
         }),
       } as Response);
-
       const response = await provider.chat({
         model: "claude-sonnet-4",
         system: "Test",
@@ -279,20 +278,15 @@ describe("Provider Unit Tests", () => {
       });
 
       // shortcuts 테스트
-      expect(response.content).toBe("The answer is 42");
-      expect(response.thinking).toBe("Let me think about this...");
-      expect(response.finish_reason).toBe("stop");
-
-      // 기존 방식도 여전히 작동
-      expect(response.choices[0].message.thinking).toBe(
-        "Let me think about this..."
-      );
-      // shortcuts 테스트
+      expect(response.content).toBe("I'll check the weather.");
       expect(response.tool_calls).toBeDefined();
       expect(response.tool_calls?.[0].function.name).toBe("get_weather");
       expect(response.finish_reason).toBe("tool_calls");
 
       // 기존 방식도 여전히 작동
+      expect(response.choices[0].message.content).toBe(
+        "I'll check the weather."
+      );
       expect(response.choices[0].message.tool_calls).toBeDefined();
       expect(response.choices[0].message.tool_calls?.[0].function.name).toBe(
         "get_weather"

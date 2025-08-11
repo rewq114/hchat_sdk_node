@@ -6,20 +6,19 @@ import { MockMCPManager } from "./mock-mcp";
 // Provider들을 모킹하여 실제 네트워크 요청을 방지합니다.
 const mockStream = jest.fn();
 const mockChat = jest.fn();
-
-jest.mock("../src/providers/openai.provider", () => ({
+jest.mock("../src/providers/openai", () => ({
   OpenAIProvider: jest.fn().mockImplementation(() => ({
     stream: mockStream,
     chat: mockChat,
   })),
 }));
-jest.mock("../src/providers/claude.provider", () => ({
+jest.mock("../src/providers/claude", () => ({
   ClaudeProvider: jest.fn().mockImplementation(() => ({
     stream: mockStream,
     chat: mockChat,
   })),
 }));
-jest.mock("../src/providers/gemini.provider", () => ({
+jest.mock("../src/providers/gemini", () => ({
   GeminiProvider: jest.fn().mockImplementation(() => ({
     stream: mockStream,
     chat: mockChat,
@@ -267,16 +266,8 @@ describe("HChat Client - Unit Tests", () => {
     });
   });
   describe("Feature support", () => {
-    it("should warn when using unsupported features", async () => {
-      const consoleSpy = jest.spyOn(console, "log").mockImplementation();
-
-      // Create client with debug enabled
-      const debugClient = new HChat(
-        { apiKey: "test-key", debug: true },
-        new MockMCPManager()
-      );
-
-      // Gemini doesn't support tools
+    it("should pass through tools even for models that may not support them", async () => {
+      // 현재 구현은 서버가 기능 지원 여부를 판단하도록 하고 있음
       const request: ChatRequest = {
         model: "gemini-2.5-pro",
         system: "System",
@@ -292,19 +283,17 @@ describe("HChat Client - Unit Tests", () => {
         ],
       };
 
-      await debugClient.chat(request);
+      await client.chat(request);
 
-      expect(consoleSpy).toHaveBeenCalledWith(
-        "[HChat]",
-        "Warning: Model gemini-2.5-pro does not support tools"
-      );
-
-      consoleSpy.mockRestore();
+      const calledWith = mockChat.mock.calls[0][0];
+      // tools가 그대로 전달되는지 확인
+      expect(calledWith.tools).toBeDefined();
+      expect(calledWith.tools).toHaveLength(1);
     });
 
-    it("should disable thinking mode for unsupported models", async () => {
+    it("should pass through thinking mode as requested", async () => {
       const request: ChatRequest = {
-        model: "gpt-4.1", // GPT doesn't support thinking
+        model: "gpt-4.1",
         system: "System",
         content: [{ role: "user", content: "Test" }],
         thinking: true,
@@ -313,7 +302,8 @@ describe("HChat Client - Unit Tests", () => {
       await client.chat(request);
 
       const calledWith = mockChat.mock.calls[0][0];
-      expect(calledWith.thinking).toBe(false);
+      // thinking이 요청한 대로 전달되는지 확인
+      expect(calledWith.thinking).toBe(true);
     });
   });
 

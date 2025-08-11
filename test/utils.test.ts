@@ -1,6 +1,5 @@
 import "jest";
 import { getModelProvider } from "../src/utils/model";
-import { parseFeatureError } from "../src/utils/feature-support";
 import { parseSSEStream } from "../src/utils/sse-parser";
 
 describe("Utils Tests", () => {
@@ -28,53 +27,6 @@ describe("Utils Tests", () => {
       expect(() => getModelProvider("unknown-model")).toThrow(
         "Unknown model provider for: unknown-model"
       );
-    });
-  });
-  describe("Feature Error Parsing", () => {
-    it("should parse feature not supported error", () => {
-      const error = {
-        code: "FEATURE_NOT_SUPPORTED",
-        feature: "thinking",
-        model: "gpt-4",
-        message: "Thinking is not supported for this model",
-      };
-
-      const parsed = parseFeatureError(error);
-      expect(parsed).not.toBeNull();
-      expect(parsed?.code).toBe("FEATURE_NOT_SUPPORTED");
-      expect(parsed?.feature).toBe("thinking");
-      expect(parsed?.suggestion).toContain("Claude");
-    });
-
-    it("should parse thinking error from message", () => {
-      const error = {
-        message: "thinking blocks are not supported for this model",
-      };
-
-      const parsed = parseFeatureError(error);
-      expect(parsed).not.toBeNull();
-      expect(parsed?.code).toBe("THINKING_NOT_SUPPORTED");
-      expect(parsed?.feature).toBe("thinking");
-    });
-
-    it("should parse tools error from message", () => {
-      const error = {
-        message: "tools are not supported for this model",
-      };
-
-      const parsed = parseFeatureError(error);
-      expect(parsed).not.toBeNull();
-      expect(parsed?.code).toBe("TOOLS_NOT_SUPPORTED");
-      expect(parsed?.feature).toBe("tools");
-    });
-
-    it("should return null for non-feature errors", () => {
-      const error = {
-        message: "Network error",
-      };
-
-      const parsed = parseFeatureError(error);
-      expect(parsed).toBeNull();
     });
   });
 
